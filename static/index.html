@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cancellation Plan Scheduler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">CP</span>
+        <div>
+          <h1>Cancellation Plan</h1>
+          <p>Scheduler Dashboard</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <button type="button" class="nav-btn active" data-panel="dashboard">Dashboard</button>
+        <button type="button" class="nav-btn" data-panel="schedule">Schedule</button>
+        <button type="button" class="nav-btn" data-panel="run">Run Job</button>
+        <button type="button" class="nav-btn" data-panel="settings">Settings</button>
+      </nav>
+      <div class="api-key-block">
+        <label for="apiKey">API Key <span class="optional">(if configured)</span></label>
+        <input type="password" id="apiKey" placeholder="X-API-Key value" autocomplete="off" />
+        <button type="button" id="saveApiKey" class="btn btn-ghost btn-sm">Save locally</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <h2 id="pageTitle">Dashboard</h2>
+        <button type="button" id="refreshBtn" class="btn btn-ghost">
+          <span class="refresh-icon">↻</span> Refresh
+        </button>
+      </header>
+
+      <section id="panel-dashboard" class="panel active">
+        <div class="status-grid" id="statusGrid">
+          <article class="card status-card loading">Loading…</article>
+        </div>
+        <article class="card schedule-preview">
+          <h3>Current schedule</h3>
+          <dl id="schedulePreview" class="detail-list"></dl>
+        </article>
+        <article class="card results-card">
+          <div class="results-header">
+            <div>
+              <h3>Latest cancellation plan</h3>
+              <span id="resultsMeta" class="results-meta"></span>
+              <span id="resultsBadge" class="status-pill hidden"></span>
+            </div>
+            <div id="resultsActions" class="results-actions hidden">
+              <span id="resultsRowCount" class="row-count-label"></span>
+              <button type="button" id="selectAllRowsBtn" class="btn btn-ghost btn-sm">Select all</button>
+              <button type="button" id="saveDraftBtn" class="btn btn-ghost btn-sm">Save edits</button>
+              <button type="button" id="postTeamsBtn" class="btn btn-primary btn-sm">Post to Teams</button>
+            </div>
+          </div>
+          <div id="resultsTableWrap" class="table-wrap">
+            <p class="hint">No results yet. Run the job to see today and tomorrow's plan.</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="panel-schedule" class="panel">
+        <article class="card">
+          <h3>Update daily schedule</h3>
+          <p class="hint">Changes apply immediately without restarting the server.</p>
+          <form id="scheduleForm" class="form-grid">
+            <div class="field">
+              <label for="scheduleHour">Hour (24h)</label>
+              <input type="number" id="scheduleHour" min="0" max="23" required />
+            </div>
+            <div class="field">
+              <label for="scheduleMinute">Minute</label>
+              <input type="number" id="scheduleMinute" min="0" max="59" required />
+            </div>
+            <div class="field field-wide">
+              <label for="scheduleTz">Timezone</label>
+              <select id="scheduleTz">
+                <option value="America/Los_Angeles">America/Los_Angeles (Pacific)</option>
+                <option value="America/Denver">America/Denver (Mountain)</option>
+                <option value="America/Chicago">America/Chicago (Central)</option>
+                <option value="America/New_York">America/New_York (Eastern)</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save schedule</button>
+            </div>
+          </form>
+          <div id="scheduleResult" class="result-box hidden"></div>
+        </article>
+      </section>
+
+      <section id="panel-run" class="panel">
+        <article class="card">
+          <h3>Run cancellation plan now</h3>
+          <p class="hint">Fetches data from SharePoint and builds the plan. Posts to Teams only when auto-post is enabled in Settings.</p>
+          <button type="button" id="runJobBtn" class="btn btn-primary btn-lg">Run now</button>
+          <div id="runSummary" class="run-summary hidden"></div>
+          <div id="runResultsActions" class="results-actions hidden">
+            <span id="runRowCount" class="row-count-label"></span>
+            <button type="button" id="runSelectAllRowsBtn" class="btn btn-ghost btn-sm">Select all</button>
+            <button type="button" id="runSaveDraftBtn" class="btn btn-ghost btn-sm">Save edits</button>
+            <button type="button" id="runPostTeamsBtn" class="btn btn-primary btn-sm">Post to Teams</button>
+          </div>
+          <div id="runResultsTable" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section id="panel-settings" class="panel">
+        <article class="card">
+          <h3>Posting settings</h3>
+          <p class="hint">When auto-post is off, review and edit the plan before posting to the Teams thread.</p>
+          <label class="toggle-row">
+            <input type="checkbox" id="autoPostToggle" checked />
+            <span class="toggle-label">
+              <strong>Auto-post to Teams</strong>
+              <small>Post immediately after each scheduled or manual run</small>
+            </span>
+          </label>
+          <button type="button" id="saveSettingsBtn" class="btn btn-primary">Save settings</button>
+        </article>
+      </section>
+
+      <footer class="log-footer">
+        <h4>Activity log</h4>
+        <pre id="activityLog" class="activity-log"></pre>
+      </footer>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
