@@ -75,15 +75,31 @@ def _strip_blocked_accounts_from_action(action_str):
     return re.sub(r"\s+", " ", s).strip() or action_str
 
 
+def _plan_dates_to_timestamps(plan_dates: list[str]) -> list[pd.Timestamp]:
+    return [pd.to_datetime(d).normalize() for d in plan_dates]
+
+
+def format_plan_date_range(plan_dates: list[str]) -> str:
+    """Human-readable date range for summaries (e.g. '22-May-2026 and 23-May-2026')."""
+    formatted = [pd.to_datetime(d).strftime("%d-%b-%Y") for d in plan_dates]
+    if len(formatted) == 1:
+        return formatted[0]
+    if len(formatted) == 2:
+        return f"{formatted[0]} and {formatted[1]}"
+    return ", ".join(formatted[:-1]) + f", and {formatted[-1]}"
+
+
 def process_cancellation_plan(
     inventory_df: pd.DataFrame,
     confirmed_df: pd.DataFrame,
     credit_df: pd.DataFrame,
     mm_is_df: pd.DataFrame,
+    *,
+    plan_dates: list[str],
 ) -> pd.DataFrame:
     """
     Run cancellation/modification analysis on in-memory data.
-    Returns output DataFrame (may be empty if no cancellations for today/tomorrow).
+    Returns output DataFrame (may be empty if no cancellations in the plan window).
     """
     df = inventory_df.copy()
     confirmed_df = confirmed_df.copy()
@@ -98,9 +114,12 @@ def process_cancellation_plan(
         f"Expected column 'cancel_by' on inventory sheet; got: {list(df.columns)[:20]}"
       )
 
+    if not plan_dates:
+      raise ValueError("plan_dates must include at least one date")
+
     df["cancel_by"] = pd.to_datetime(df["cancel_by"], errors="coerce")
     today = pd.to_datetime("today").normalize()
-    tomorrow = today + pd.Timedelta(days=1)
+    plan_ts = _plan_dates_to_timestamps(plan_dates)
 
     df = df[df["cancel_by"] >= today].copy()
 
@@ -114,7 +133,7 @@ def process_cancellation_plan(
         if col in credit_df.columns:
             credit_df[col] = pd.to_numeric(credit_df[col], errors="coerce").fillna(0)
 
-    filtered_df = df[(df["cancel_by"] == today) | (df["cancel_by"] == tomorrow)].copy()
+    filtered_df = df[df["cancel_by"].isin(plan_ts)].copy()
 
     if filtered_df.empty:
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
@@ -488,15 +507,8 @@ def dataframe_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Cancellation a
     return buffer.getvalue()
 
 
-def build_summary_message(df: pd.DataFrame) -> str:
-    today = pd.to_datetime("today").normalize()
-    tomorrow = today + pd.Timedelta(days=1)
+def build_summary_message(df: pd.DataFrame, *, plan_dates: list[str]) -> str:
+    date_range = format_plan_date_range(plan_dates)
     if df.empty:
-        return (
-            f"No cancellations or modifications for "
-            f"{today.strftime('%d-%b-%Y')} and {tomorrow.strftime('%d-%b-%Y')}."
-        )
-    return (
-        f"Cancellation plan: {len(df)} row(s) for "
-        f"{today.strftime('%d-%b-%Y')} and {tomorrow.strftime('%d-%b-%Y')}."
-    )
+        return f"No cancellations or modifications for {date_range}."
+    return f"Cancellation plan: {len(df)} row(s) for {date_range}."

@@ -9,7 +9,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from app_settings import get_auto_post
+from app_settings import get_auto_post, get_plan_dates
 from cancellation_processor import (
   OUTPUT_COLUMNS,
   build_summary_message,
@@ -150,14 +150,17 @@ def run_scheduled_job() -> dict[str, Any]:
   logger.info("Starting cancellation plan job (auto_post=%s)", get_auto_post())
   inputs = load_sharepoint_inputs()
 
+  plan_dates = get_plan_dates()
+
   result_df = process_cancellation_plan(
     inputs["inventory_df"],
     inputs["confirmed_df"],
     inputs["credit_df"],
     inputs["mm_is_df"],
+    plan_dates=plan_dates,
   )
 
-  summary = build_summary_message(result_df)
+  summary = build_summary_message(result_df, plan_dates=plan_dates)
   payload = build_result_payload(result_df, summary)
 
   posted = False
@@ -217,7 +220,7 @@ def update_draft_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     normalized.append({col: _serialize_cell(row.get(col, "")) for col in OUTPUT_COLUMNS})
 
   df = pd.DataFrame(normalized, columns=OUTPUT_COLUMNS) if normalized else pd.DataFrame(columns=OUTPUT_COLUMNS)
-  summary = build_summary_message(df)
+  summary = build_summary_message(df, plan_dates=get_plan_dates())
 
   payload = {
     "summary": summary,

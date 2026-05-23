@@ -14,7 +14,9 @@ const RESULT_COLUMNS = [
   { key: "action", label: "Action" },
 ];
 
-let appSettings = { auto_post: true };
+let appSettings = { auto_post: true, plan_dates: [] };
+let selectedPlanDates = new Set();
+let calendarViewMonth = new Date();
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -112,9 +114,139 @@ function formatResultMeta(result) {
 
 const EXTRA_COLS = 2; // Post checkbox + Delete
 
+function toIsoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseIsoDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function defaultPlanDates() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return [toIsoDate(today), toIsoDate(tomorrow)];
+}
+
+function formatPlanDatesLabel(dates) {
+  const sorted = [...(dates || [])].sort();
+  if (!sorted.length) return "No dates selected";
+  if (sorted.length <= 3) {
+    return sorted.map((iso) => parseIsoDate(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" })).join(", ");
+  }
+  const first = parseIsoDate(sorted[0]).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const last = parseIsoDate(sorted[sorted.length - 1]).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return `${sorted.length} dates (${first} – ${last})`;
+}
+
+function updatePlanDatesSummary() {
+  const el = $("#planDatesSummary");
+  if (!el) return;
+  const sorted = [...selectedPlanDates].sort();
+  if (!sorted.length) {
+    el.textContent = "No dates selected — pick at least one date.";
+    el.classList.add("warn");
+    return;
+  }
+  el.classList.remove("warn");
+  el.textContent = `Selected: ${formatPlanDatesLabel(sorted)}`;
+}
+
+function renderPlanCalendar() {
+  const root = $("#planCalendar");
+  if (!root) return;
+
+  const view = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), 1);
+  const year = view.getFullYear();
+  const month = view.getMonth();
+  const todayIso = toIsoDate(new Date());
+
+  const monthLabel = view.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const weekdays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthDays = new Date(year, month, 0).getDate();
+
+  let cells = "";
+  for (let i = 0; i < firstDow; i += 1) {
+    const day = prevMonthDays - firstDow + i + 1;
+    const d = new Date(year, month - 1, day);
+    const iso = toIsoDate(d);
+    const selected = selectedPlanDates.has(iso) ? " selected" : "";
+    cells += `<button type="button" class="plan-cal-day other-month${selected}" data-date="${iso}">${day}</button>`;
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const d = new Date(year, month, day);
+    const iso = toIsoDate(d);
+    const classes = ["plan-cal-day"];
+    if (selectedPlanDates.has(iso)) classes.push("selected");
+    if (iso === todayIso) classes.push("today");
+    cells += `<button type="button" class="${classes.join(" ")}" data-date="${iso}">${day}</button>`;
+  }
+  const totalCells = firstDow + daysInMonth;
+  const trailing = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let day = 1; day <= trailing; day += 1) {
+    const d = new Date(year, month + 1, day);
+    const iso = toIsoDate(d);
+    const selected = selectedPlanDates.has(iso) ? " selected" : "";
+    cells += `<button type="button" class="plan-cal-day other-month${selected}" data-date="${iso}">${day}</button>`;
+  }
+
+  root.innerHTML = `
+    <div class="plan-cal-header">
+      <h4>${escapeHtml(monthLabel)}</h4>
+      <div class="plan-cal-nav">
+        <button type="button" data-cal-nav="prev" aria-label="Previous month">‹</button>
+        <button type="button" data-cal-nav="next" aria-label="Next month">›</button>
+      </div>
+    </div>
+    <div class="plan-cal-weekdays">${weekdays.map((w) => `<span>${w}</span>`).join("")}</div>
+    <div class="plan-cal-grid">${cells}</div>
+  `;
+
+  updatePlanDatesSummary();
+}
+
+function setSelectedPlanDates(dates) {
+  selectedPlanDates = new Set((dates && dates.length ? dates : defaultPlanDates()).sort());
+  if (selectedPlanDates.size) {
+    calendarViewMonth = parseIsoDate([...selectedPlanDates][0]);
+  }
+  renderPlanCalendar();
+}
+
+function togglePlanDate(iso) {
+  if (selectedPlanDates.has(iso)) {
+    if (selectedPlanDates.size === 1) {
+      showToast("At least one date must be selected", true);
+      return;
+    }
+    selectedPlanDates.delete(iso);
+  } else {
+    if (selectedPlanDates.size >= 30) {
+      showToast("At most 30 dates can be selected", true);
+      return;
+    }
+    selectedPlanDates.add(iso);
+  }
+  renderPlanCalendar();
+}
+
+function getSelectedPlanDatesSorted() {
+  return [...selectedPlanDates].sort();
+}
+
 function buildReadOnlyTable(rows) {
   if (!rows?.length) {
-    return `<table class="results-table"><tbody><tr class="empty-row"><td colspan="${RESULT_COLUMNS.length}">No cancellations for today or tomorrow.</td></tr></tbody></table>`;
+    const label = formatPlanDatesLabel(appSettings.plan_dates?.length ? appSettings.plan_dates : getSelectedPlanDatesSorted());
+    return `<table class="results-table"><tbody><tr class="empty-row"><td colspan="${RESULT_COLUMNS.length}">No cancellations for ${escapeHtml(label)}.</td></tr></tbody></table>`;
   }
   const head = RESULT_COLUMNS.map((c) => `<th>${c.label}</th>`).join("");
   const body = rows
@@ -308,17 +440,21 @@ function renderJobResults(
   }
 }
 
+function applySettingsToForm(s) {
+  appSettings = s;
+  $("#autoPostToggle").checked = !!s.auto_post;
+  setSelectedPlanDates(s.plan_dates);
+}
+
 async function loadSettings() {
   try {
     const s = await api("/settings/");
-    appSettings = s;
-    $("#autoPostToggle").checked = !!s.auto_post;
+    applySettingsToForm(s);
   } catch {
     try {
       const health = await api("/health");
       if (health.settings) {
-        appSettings = health.settings;
-        $("#autoPostToggle").checked = !!health.settings.auto_post;
+        applySettingsToForm(health.settings);
       }
     } catch (e) {
       log(`Settings load error: ${e.message}`, "error");
@@ -328,13 +464,17 @@ async function loadSettings() {
 
 async function saveSettings() {
   const auto_post = $("#autoPostToggle").checked;
+  const plan_dates = getSelectedPlanDatesSorted();
+  if (!plan_dates.length) {
+    throw new Error("Select at least one date on the calendar.");
+  }
   const s = await api("/settings/", {
     method: "POST",
-    body: JSON.stringify({ auto_post }),
+    body: JSON.stringify({ auto_post, plan_dates }),
   });
-  appSettings = s;
-  showToast(auto_post ? "Auto-post enabled" : "Manual review enabled");
-  log(`Auto-post: ${auto_post ? "on" : "off"}`, "success");
+  applySettingsToForm(s);
+  showToast(`Settings saved (${formatPlanDatesLabel(plan_dates)})`);
+  log(`Auto-post: ${auto_post ? "on" : "off"}, plan dates: ${plan_dates.join(", ")}`, "success");
   await loadLatestResults();
 }
 
@@ -379,6 +519,11 @@ function renderStatus(health) {
     { label: "Server", value: health.status === "ok" ? "Online" : "Error", ok: health.status === "ok" },
     { label: "Scheduler", value: health.scheduler_running ? "Running" : "Stopped", ok: health.scheduler_running },
     { label: "Auto-post", value: appSettings.auto_post ? "On" : "Off (manual)", ok: true },
+    {
+      label: "Plan dates",
+      value: formatPlanDatesLabel(appSettings.plan_dates),
+      ok: (appSettings.plan_dates || []).length > 0,
+    },
     { label: "SharePoint", value: health.sharepoint_configured ? "Configured" : "Missing", ok: health.sharepoint_configured },
     { label: "Power Automate", value: health.webhook_configured ? "Configured" : "Missing", ok: health.webhook_configured },
     {
@@ -650,4 +795,26 @@ if (savedKey) $("#apiKey").value = savedKey;
 bindEditableTable($("#resultsTableWrap"), $("#resultsRowCount"));
 bindEditableTable($("#runResultsTable"), $("#runRowCount"));
 
+$("#planCalendar")?.addEventListener("click", (e) => {
+  const nav = e.target.closest("[data-cal-nav]");
+  if (nav) {
+    const delta = nav.dataset.calNav === "prev" ? -1 : 1;
+    calendarViewMonth = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth() + delta, 1);
+    renderPlanCalendar();
+    return;
+  }
+  const dayBtn = e.target.closest(".plan-cal-day[data-date]");
+  if (dayBtn) togglePlanDate(dayBtn.dataset.date);
+});
+
+$("#planTodayTomorrowBtn")?.addEventListener("click", () => {
+  setSelectedPlanDates(defaultPlanDates());
+});
+
+$("#planClearDatesBtn")?.addEventListener("click", () => {
+  selectedPlanDates.clear();
+  renderPlanCalendar();
+});
+
+setSelectedPlanDates(defaultPlanDates());
 loadSettings().then(loadDashboard);

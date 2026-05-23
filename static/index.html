@@ -63,7 +63,7 @@
             </div>
           </div>
           <div id="resultsTableWrap" class="table-wrap">
-            <p class="hint">No results yet. Run the job to see today and tomorrow's plan.</p>
+            <p class="hint">No results yet. Run the job to build the cancellation plan.</p>
           </div>
         </article>
       </section>
@@ -126,6 +126,16 @@
               <small>Post immediately after each scheduled or manual run</small>
             </span>
           </label>
+          <div class="plan-dates-field">
+            <label>Plan dates</label>
+            <p class="hint">Click dates on the calendar to include or exclude them from the cancellation plan.</p>
+            <div id="planCalendar" class="plan-calendar" aria-label="Select plan dates"></div>
+            <div class="plan-calendar-actions">
+              <button type="button" id="planTodayTomorrowBtn" class="btn btn-ghost btn-sm">Today + tomorrow</button>
+              <button type="button" id="planClearDatesBtn" class="btn btn-ghost btn-sm">Clear</button>
+            </div>
+            <p id="planDatesSummary" class="plan-dates-summary"></p>
+          </div>
           <button type="button" id="saveSettingsBtn" class="btn btn-primary">Save settings</button>
         </article>
       </section>

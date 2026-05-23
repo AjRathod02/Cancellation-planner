@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app_settings import get_settings_dict, set_auto_post
+from app_settings import get_settings_dict, set_auto_post, set_plan_dates
 from config import get_settings, validate_settings
 from job_runner import (
   get_last_job_result,
@@ -58,6 +58,11 @@ class ScheduleUpdate(BaseModel):
 
 class AppSettingsUpdate(BaseModel):
   auto_post: bool
+  plan_dates: list[str] = Field(
+    min_length=1,
+    max_length=30,
+    description="ISO dates (YYYY-MM-DD) to include in the cancellation plan",
+  )
 
 
 class DraftRowsUpdate(BaseModel):
@@ -226,7 +231,11 @@ def _settings_get():
 
 def _settings_post(body: AppSettingsUpdate):
   set_auto_post(body.auto_post)
-  logger.info("auto_post set to %s", body.auto_post)
+  try:
+    set_plan_dates(body.plan_dates)
+  except ValueError as exc:
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+  logger.info("auto_post set to %s, plan_dates set to %s", body.auto_post, body.plan_dates)
   return get_settings_dict()
 
 
