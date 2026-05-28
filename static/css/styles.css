@@ -429,20 +429,26 @@ body {
   overflow-x: auto;
   border-radius: 8px;
   border: 1px solid var(--border);
+  -webkit-overflow-scrolling: touch;
 }
 
 .results-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  table-layout: auto;
 }
 
 .results-table th,
 .results-table td {
-  padding: 0.55rem 0.65rem;
+  padding: 0.65rem 0.75rem;
   text-align: left;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.45;
 }
 
 .results-table th {
@@ -453,15 +459,48 @@ body {
   white-space: nowrap;
   position: sticky;
   top: 0;
+  z-index: 1;
 }
 
 .results-table tbody tr:hover {
   background: var(--surface-hover);
 }
 
-.results-table td.action-cell {
-  max-width: 280px;
-  word-break: break-word;
+.results-table .col-cancel_by,
+.results-table .col-checkin,
+.results-table .col-checkout,
+.results-table .col-booking_date {
+  min-width: 6.75rem;
+}
+
+.results-table .col-confirmation {
+  min-width: 6.5rem;
+}
+
+.results-table .col-account {
+  min-width: 8rem;
+}
+
+.results-table .col-resort {
+  min-width: 9rem;
+}
+
+.results-table .col-Unit {
+  min-width: 5.5rem;
+}
+
+.results-table .col-credits {
+  min-width: 4.5rem;
+}
+
+.results-table .col-rented_ {
+  min-width: 9rem;
+}
+
+.results-table td.action-cell,
+.results-table th.col-action {
+  min-width: 22rem;
+  max-width: 36rem;
 }
 
 .results-table .empty-row td {
@@ -533,25 +572,40 @@ body {
   color: var(--success);
 }
 
-.results-table input.cell-input {
+.results-table input.cell-input,
+.results-table textarea.cell-input {
+  box-sizing: border-box;
   width: 100%;
-  min-width: 4rem;
-  padding: 0.35rem 0.45rem;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
 }
 
-.results-table input.cell-input:focus {
+.results-table input.cell-input {
+  min-width: 5.5rem;
+}
+
+.results-table textarea.cell-input {
+  min-height: 4.5rem;
+  resize: vertical;
+  field-sizing: content;
+}
+
+.results-table input.cell-input:focus,
+.results-table textarea.cell-input:focus {
   outline: none;
   border-color: var(--accent);
 }
 
-.results-table td.action-cell input.cell-input {
-  min-width: 12rem;
+.results-table td.action-cell textarea.cell-input {
+  min-width: 20rem;
+  min-height: 5rem;
 }
 
 .toggle-row {

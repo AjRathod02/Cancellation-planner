@@ -114,6 +114,19 @@ function formatResultMeta(result) {
 
 const EXTRA_COLS = 2; // Post checkbox + Delete
 
+function colClassName(key) {
+  if (key === "action") return "action-cell col-action";
+  return `col-${key.replace(/[^a-zA-Z0-9]/g, "_")}`;
+}
+
+function cellEditorHtml(key, val) {
+  const escaped = escapeHtml(val);
+  if (key === "action") {
+    return `<textarea class="cell-input cell-textarea" data-col="${key}" rows="3">${escaped}</textarea>`;
+  }
+  return `<input class="cell-input" data-col="${key}" value="${escaped}" />`;
+}
+
 function toIsoDate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -248,13 +261,12 @@ function buildReadOnlyTable(rows) {
     const label = formatPlanDatesLabel(appSettings.plan_dates?.length ? appSettings.plan_dates : getSelectedPlanDatesSorted());
     return `<table class="results-table"><tbody><tr class="empty-row"><td colspan="${RESULT_COLUMNS.length}">No cancellations for ${escapeHtml(label)}.</td></tr></tbody></table>`;
   }
-  const head = RESULT_COLUMNS.map((c) => `<th>${c.label}</th>`).join("");
+  const head = RESULT_COLUMNS.map((c) => `<th class="${colClassName(c.key)}">${c.label}</th>`).join("");
   const body = rows
     .map((row) => {
       const cells = RESULT_COLUMNS.map((c) => {
         const val = row[c.key] ?? "";
-        const cls = c.key === "action" ? ' class="action-cell"' : "";
-        return `<td${cls}>${escapeHtml(val)}</td>`;
+        return `<td class="${colClassName(c.key)}">${escapeHtml(val)}</td>`;
       }).join("");
       return `<tr>${cells}</tr>`;
     })
@@ -269,14 +281,13 @@ function buildEditableTable(rows) {
   }
   const head =
     `<th class="col-post"><input type="checkbox" class="include-all" title="Select all" checked /> Post</th>` +
-    RESULT_COLUMNS.map((c) => `<th>${c.label}</th>`).join("") +
+    RESULT_COLUMNS.map((c) => `<th class="${colClassName(c.key)}">${c.label}</th>`).join("") +
     `<th class="col-delete">Delete</th>`;
   const body = rows
     .map((row, i) => {
       const cells = RESULT_COLUMNS.map((c) => {
-        const val = escapeHtml(row[c.key] ?? "");
-        const cls = c.key === "action" ? "action-cell" : "";
-        return `<td class="${cls}"><input class="cell-input" data-col="${c.key}" value="${val}" /></td>`;
+        const val = row[c.key] ?? "";
+        return `<td class="${colClassName(c.key)}">${cellEditorHtml(c.key, val)}</td>`;
       }).join("");
       return `<tr data-row="${i}">
         <td class="col-post"><input type="checkbox" class="include-row" checked title="Include when posting" /></td>
@@ -305,8 +316,8 @@ function collectRowsFromTable(tableOrWrap, { forPost = false } = {}) {
     .map((tr) => {
       const row = {};
       RESULT_COLUMNS.forEach((c) => {
-        const inp = tr.querySelector(`[data-col="${c.key}"]`);
-        row[c.key] = inp ? inp.value.trim() : "";
+        const field = tr.querySelector(`[data-col="${c.key}"]`);
+        row[c.key] = field ? field.value.trim() : "";
       });
       return row;
     });
